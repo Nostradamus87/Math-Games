@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MathQuest - KSSR Edition</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.300.0"
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect, useMemo } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { Home, Shirt, Play, Star, CheckCircle, XCircle, Award, ChevronRight, Lock } from 'lucide-react';
+
+    // ==========================================
+    // 1. COSMETICS & AVATAR DATABASE
+    // ==========================================
+    const COSMETICS_DB = {
+      hats: [
+        { id: 'h_none', name: 'No Hat', rarity: 'default', color: 'transparent' },
+        { id: 'h_redcap', name: 'Red School Cap', rarity: 'common', type: 'cap', color: '#ef4444' },
+        { id: 'h_greybeanie', name: 'Grey Beanie', rarity: 'rare', type: 'beanie', color: '#6b7280' },
+        { id: 'h_crown', name: 'Math Crown', rarity: 'epic', type: 'crown', color: '#fbbf24' },
+        { id: 'h_hero', name: 'Hero Helmet', rarity: 'legendary', type: 'helmet', color: '#dc2626' },
+      ],
+      shirts: [
+        { id: 's_pajamas', name: 'Grey Pyjamas', rarity: 'default', color: '#d1d5db', pattern: 'stripes' },
+        { id: 's_whiteschool', name: 'White Uniform', rarity: 'common', color: '#ffffff' },
+        { id: 's_redtshirt', name: 'Red T-Shirt', rarity: 'rare', color: '#ef4444' },
+        { id: 's_polka', name: 'Polkadot Shirt', rarity: 'epic', color: '#f87171' },
+        { id: 's_armour', name: 'Math Armour', rarity: 'legendary', color: '#9ca3af' },
+      ],
+      pants: [
+        { id: 'p_pajamas', name: 'Grey Pyjama Pants', rarity: 'default', color: '#d1d5db' },
+        { id: 'p_schoolshorts', name: 'Blue School Shorts', rarity: 'common', color: '#1e3a8a' },
+        { id: 'p_jeans', name: 'Grey Jeans', rarity: 'rare', color: '#4b5563' },
+        { id: 'p_redtrack', name: 'Red Trackpants', rarity: 'epic', color: '#ef4444' },
+        { id: 'p_hero', name: 'Hero Leggings', rarity: 'legendary', color: '#374151' },
+      ],
+      shoes: [
+        { id: 'sh_none', name: 'Barefoot', rarity: 'default', color: '#fbcfe8' },
+        { id: 'sh_whiteschool', name: 'White School Shoes', rarity: 'common', color: '#ffffff' },
+        { id: 'sh_redsneakers', name: 'Red Sneakers', rarity: 'rare', color: '#ef4444' },
+        { id: 'sh_boots', name: 'Grey Boots', rarity: 'epic', color: '#4b5563' },
+        { id: 'sh_wingshoes', name: 'Winged Shoes', rarity: 'legendary', color: '#fef08a' },
+      ]
+    };
+
+    // ==========================================
+    // 2. QUESTION DATABASE & GENERATOR (KSSR ALIGNED)
+    // ==========================================
+    const generateNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+    const STATIC_QUESTIONS = [
+      { std: 3, diff: 'easiest', text: 'Ali has 450 rambutan. He gives 120 to Muthu. How many rambutan does Ali have left?', options: ['330', '320', '400', '570'], answer: '330' },
+      { std: 4, diff: 'hard', text: 'A durian costs RM 45.50. Father buys 4 durians. How much must he pay?', options: ['RM 182.00', 'RM 180.50', 'RM 192.00', 'RM 145.50'], answer: 'RM 182.00' },
+      { std: 5, diff: 'very_hard', text: 'Convert 3 centuries and 4 decades into years.', options: ['340 years', '304 years', '34 years', '3400 years'], answer: '340 years' },
+      { std: 6, diff: 'extreme', text: 'Aisha invested RM 15,000 in a bank with an interest rate of 4% per year. What is the total money after 1 year?', options: ['RM 15,600', 'RM 15,400', 'RM 16,000', 'RM 15,040'], answer: 'RM 15,600' }
+    ];
+
+    const generateQuestion = (standard, difficulty) => {
+      const availableStatic = STATIC_QUESTIONS.filter(q => q.std === standard && q.diff === difficulty);
+      if (Math.random() < 0.2 && availableStatic.length > 0) {
+        const q = availableStatic[generateNumber(0, availableStatic.length - 1)];
+        return { ...q, options: [...q.options].sort(() => Math.random() - 0.5) };
+      }
+
+      let num1, num2, answer, questionText;
+      let options = [];
+      
+      if (standard === 3) {
+        if (difficulty === 'easiest') {
+          num1 = generateNumber(100, 999); num2 = generateNumber(10, 99);
+          answer = num1 + num2; questionText = `${num1} + ${num2} = ?`;
+        } else if (difficulty === 'hard') {
+          num1 = generateNumber(1000, 5000); num2 = generateNumber(100, 999);
+          answer = num1 - num2; questionText = `${num1} - ${num2} = ?`;
+        } else if (difficulty === 'very_hard') {
+          num1 = generateNumber(10, 99); num2 = generateNumber(2, 9);
+          answer = num1 * num2; questionText = `${num1} × ${num2} = ?`;
+        } else {
+          num1 = generateNumber(100, 999); num2 = generateNumber(2, 9);
+          answer = Math.floor(num1 / num2); questionText = `Estimate: ${num1} ÷ ${num2} is closest to?`;
+        }
+      } else if (standard === 4) {
+        if (difficulty === 'easiest') {
+          num1 = generateNumber(10000, 50000); num2 = generateNumber(1000, 9999);
+          answer = num1 + num2; questionText = `${num1} + ${num2} = ?`;
+        } else if (difficulty === 'hard') {
+           num1 = (generateNumber(10, 999) / 10).toFixed(1); num2 = (generateNumber(10, 99) / 10).toFixed(1);
+           answer = (parseFloat(num1) + parseFloat(num2)).toFixed(1); questionText = `${num1} + ${num2} = ?`;
+        } else if (difficulty === 'very_hard') {
+          num1 = generateNumber(10, 50); num2 = generateNumber(10, 50);
+          answer = num1 * num2; questionText = `${num1} × ${num2} = ?`;
+        } else {
+          num1 = generateNumber(100, 999);
+          answer = `RM ${(num1 * 1.5).toFixed(2)}`; questionText = `If 2 toys cost RM ${num1}, how much do 3 toys cost?`;
+          options = [`RM ${(num1 * 1.5).toFixed(2)}`, `RM ${(num1 * 2).toFixed(2)}`, `RM ${(num1).toFixed(2)}`, `RM ${(num1 * 2.5).toFixed(2)}`];
+        }
+      } else if (standard === 5) {
+         if (difficulty === 'easiest') {
+          num1 = generateNumber(100000, 500000); num2 = generateNumber(10000, 99999);
+          answer = num1 + num2; questionText = `${num1} + ${num2} = ?`;
+        } else if (difficulty === 'hard') {
+           num1 = generateNumber(1, 9); num2 = generateNumber(1, 9);
+           answer = `${num1 + num2}/10`; questionText = `${num1}/10 + ${num2}/10 = ? (Simplify if needed)`;
+        } else if (difficulty === 'very_hard') {
+          num1 = generateNumber(100, 500); 
+          answer = num1 * 12; questionText = `A factory produces ${num1} pencils a month. How many in a year?`;
+        } else {
+          num1 = generateNumber(10, 90);
+          answer = `${num1 * 1000} ml`; questionText = `Convert ${num1} Litres to mililitres.`;
+        }
+      } else if (standard === 6) {
+        if (difficulty === 'easiest') {
+          num1 = generateNumber(10, 99);
+          answer = `${num1}0000`; questionText = `Write ${num1} million in digits.`;
+          options = [`${num1}0000`, `${num1}000000`, `${num1}000`, `${num1}00000`];
+        } else if (difficulty === 'hard') {
+           num1 = generateNumber(10, 50);
+           answer = num1 * 0.2; questionText = `What is 20% of ${num1}?`;
+        } else if (difficulty === 'very_hard') {
+          num1 = generateNumber(50, 150); num2 = generateNumber(20, 80);
+          answer = num1 - (num1 * (num2/100)); questionText = `An item costs RM${num1}. It has a ${num2}% discount. New price?`;
+          answer = `RM ${answer.toFixed(2)}`;
+        } else {
+          num1 = generateNumber(2, 9); num2 = generateNumber(2, 9);
+          answer = `${num1}:${num2}`; questionText = `Simplify ratio ${num1*4} : ${num2*4}`;
+        }
+      }
+
+      if (options.length === 0) {
+        let numericAnswer = parseFloat(answer) || parseInt(answer) || answer;
+        let isString = typeof answer === 'string';
+        
+        options.push(answer.toString());
+        while(options.length < 4) {
+          let wrong;
+          if (isString && answer.includes('RM')) {
+             let val = parseFloat(answer.replace('RM ', ''));
+             wrong = `RM ${(val + generateNumber(-50, 50) + Math.random()).toFixed(2)}`;
+          } else if (typeof numericAnswer === 'number') {
+            let offset = generateNumber(-10, 10);
+            if (offset === 0) offset = 1;
+            wrong = Math.random() > 0.5 ? (numericAnswer + offset).toString() : (numericAnswer * 1.1).toFixed(0).toString();
+          } else {
+            wrong = answer + " " + generateNumber(1,9);
+          }
+          
+          if (!options.includes(wrong) && wrong !== "NaN") {
+            options.push(wrong);
+          }
+        }
+      }
+
+      return {
+        std: standard,
+        diff: difficulty,
+        text: questionText,
+        options: options.sort(() => Math.random() - 0.5),
+        answer: answer.toString()
+      };
+    };
+
+    const AvatarVisual = ({ equippedData, size = 'large' }) => {
+      const getAttr = (category, id) => COSMETICS_DB[category].find(i => i.id === id);
+      const shirt = getAttr('shirts', equippedData.shirts);
+      const pants = getAttr('pants', equippedData.pants);
+      const hat = getAttr('hats', equippedData.hats);
+      const shoes = getAttr('shoes', equippedData.shoes);
+      
+      const svgClass = size === 'large' ? 'w-64 h-64' : 'w-32 h-32';
+
+      return (
+        <div className={`relative ${svgClass} flex items-center justify-center drop-shadow-xl`}>
+          <svg viewBox="0 0 200 300" className="w-full h-full overflow-visible">
+            <defs>
+              <linearGradient id="skin" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fbcfe8" />
+                <stop offset="100%" stopColor="#f472b6" />
+              </linearGradient>
+              <linearGradient id="shade" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
+              </linearGradient>
+            </defs>
+
+            <circle cx="100" cy="50" r="35" fill="url(#skin)" />
+            <circle cx="85" cy="45" r="4" fill="#374151" />
+            <circle cx="115" cy="45" r="4" fill="#374151" />
+            <path d="M 85 65 Q 100 75 115 65" fill="none" stroke="#374151" strokeWidth="3" strokeLinecap="round" />
+            
+            <rect x="35" y="90" width="20" height="80" rx="10" fill="url(#skin)" transform="rotate(15 45 90)" />
+            <rect x="145" y="90" width="20" height="80" rx="10" fill="url(#skin)" transform="rotate(-15 155 90)" />
+            
+            <rect x="65" y="90" width="70" height="90" rx="20" fill="url(#skin)" />
+            
+            <rect x="70" y="170" width="25" height="100" rx="12" fill="url(#skin)" />
+            <rect x="105" y="170" width="25" height="100" rx="12" fill="url(#skin)" />
+
+            {pants.id !== 'p_none' && (
+               <g>
+                 <path d="M 65 160 L 135 160 L 140 190 L 60 190 Z" fill={pants.color} />
+                 <rect x="65" y="160" width="70" height="15" fill="rgba(0,0,0,0.1)" />
+                 <rect x="67" y="170" width="31" height={pants.id.includes('shorts') ? 40 : 90} rx="5" fill={pants.color} />
+                 <rect x="102" y="170" width="31" height={pants.id.includes('shorts') ? 40 : 90} rx="5" fill={pants.color} />
+                 <path d="M 65 160 L 135 160 L 140 190 L 60 190 Z" fill="url(#shade)" pointerEvents="none"/>
+               </g>
+            )}
+
+            {shirt.id !== 's_none' && (
+              <g>
+                <rect x="63" y="88" width="74" height="85" rx="15" fill={shirt.color} />
+                <rect x="33" y="88" width="24" height="40" rx="10" fill={shirt.color} transform="rotate(15 45 90)" />
+                <rect x="143" y="88" width="24" height="40" rx="10" fill={shirt.color} transform="rotate(-15 155 90)" />
+                
+                {shirt.pattern === 'stripes' && (
+                  <g fill="rgba(255,255,255,0.5)">
+                    <rect x="63" y="100" width="74" height="10" />
+                    <rect x="63" y="120" width="74" height="10" />
+                    <rect x="63" y="140" width="74" height="10" />
+                  </g>
+                )}
+                <rect x="63" y="88" width="74" height="85" rx="15" fill="url(#shade)" pointerEvents="none"/>
+              </g>
+            )}
+
+            {shoes.id !== 'sh_none' && (
+               <g>
+                 <path d="M 60 260 L 95 260 L 100 280 L 55 280 Z" fill={shoes.color} rx="10" />
+                 <path d="M 105 260 L 140 260 L 145 280 L 100 280 Z" fill={shoes.color} />
+                 {shoes.id === 'sh_wingshoes' && (
+                   <g fill="#fff">
+                     <path d="M 50 260 Q 40 250 30 265 Q 45 270 50 270 Z" />
+                     <path d="M 150 260 Q 160 250 170 265 Q 155 270 150 270 Z" />
+                   </g>
+                 )}
+               </g>
+            )}
+
+            {hat.id !== 'h_none' && (
+               <g>
+                 {hat.type === 'cap' && (
+                   <g>
+                     <path d="M 65 30 Q 100 0 135 30 L 135 45 L 65 45 Z" fill={hat.color} />
+                     <rect x="130" y="35" width="25" height="10" rx="5" fill={hat.color} />
+                   </g>
+                 )}
+                 {hat.type === 'beanie' && (
+                   <path d="M 60 40 Q 100 -10 140 40 Z" fill={hat.color} />
+                 )}
+                 {hat.type === 'crown' && (
+                   <path d="M 65 45 L 75 10 L 100 30 L 125 10 L 135 45 Z" fill={hat.color} />
+                 )}
+                 {hat.type === 'helmet' && (
+                   <path d="M 60 50 Q 100 0 140 50 L 140 60 Q 100 40 60 60 Z" fill={hat.color} />
+                 )}
+               </g>
+            )}
+          </svg>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 3. MAIN APPLICATION COMPONENT
+    // ==========================================
+    function App() {
+      const [screen, setScreen] = useState('home'); 
+      const [selectedStd, setSelectedStd] = useState(3);
+      const [difficulty, setDifficulty] = useState('easiest');
+      
+      const [score, setScore] = useState(0);
+      const [pointsToNextUnlock, setPointsToNextUnlock] = useState(5);
+      
+      const [inventory, setInventory] = useState({
+        hats: ['h_none'], shirts: ['s_pajamas'], pants: ['p_pajamas'], shoes: ['sh_none']
+      });
+      const [equipped, setEquipped] = useState({
+        hats: 'h_none', shirts: 's_pajamas', pants: 'p_pajamas', shoes: 'sh_none'
+      });
+      
+      const [activeTab, setActiveTab] = useState('hats');
+
+      const [currentQuestion, setCurrentQuestion] = useState(null);
+      const [feedback, setFeedback] = useState(null); 
+      const [unlockModal, setUnlockModal] = useState(null); 
+
+      const getDifficultyColor = (diff) => {
+        switch(diff) {
+          case 'easiest': return 'bg-green-500';
+          case 'hard': return 'bg-yellow-500';
+          case 'very_hard': return 'bg-orange-500';
+          case 'extreme': return 'bg-red-600';
+          default: return 'bg-gray-500';
+        }
+      };
+
+      const getRarityForDifficulty = (diff) => {
+        switch(diff) {
+          case 'easiest': return 'common';
+          case 'hard': return 'rare';
+          case 'very_hard': return 'epic';
+          case 'extreme': return 'legendary';
+          default: return 'common';
+        }
+      };
+
+      const triggerUnlock = (currentDiff) => {
+        const rarityToUnlock = getRarityForDifficulty(currentDiff);
+        
+        let possibleItems = [];
+        Object.keys(COSMETICS_DB).forEach(category => {
+          COSMETICS_DB[category].forEach(item => {
+            if (item.rarity === rarityToUnlock && !inventory[category].includes(item.id)) {
+              possibleItems.push({ ...item, category });
+            }
+          });
+        });
+
+        if (possibleItems.length > 0) {
+          const unlockedItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+          
+          setInventory(prev => ({
+            ...prev,
+            [unlockedItem.category]: [...prev[unlockedItem.category], unlockedItem.id]
+          }));
+          
+          setEquipped(prev => ({
+            ...prev,
+            [unlockedItem.category]: unlockedItem.id
+          }));
+
+          setUnlockModal(unlockedItem);
+        }
+      };
+
+      const startGame = (std) => {
+        setSelectedStd(std);
+        setDifficulty('easiest');
+        loadNewQuestion(std, 'easiest');
+        setScreen('game');
+      };
+
+      const loadNewQuestion = (std, diff) => {
+        setCurrentQuestion(generateQuestion(std, diff));
+        setFeedback(null);
+      };
+
+      const handleAnswer = (selectedAns) => {
+        if (feedback) return; 
+
+        if (selectedAns === currentQuestion.answer) {
+          const newScore = score + 1;
+          setScore(newScore);
+          setFeedback({ type: 'correct', msg: '+1 Point!' });
+          
+          let nextPoints = pointsToNextUnlock - 1;
+          if (nextPoints <= 0) {
+            triggerUnlock(difficulty);
+            nextPoints = 5;
+          }
+          setPointsToNextUnlock(nextPoints);
+
+          setTimeout(() => {
+            loadNewQuestion(selectedStd, difficulty);
+          }, 1500);
+
+        } else {
+          setFeedback({ type: 'wrong', msg: 'Try Again!' });
+          setTimeout(() => { setFeedback(null); }, 1500);
+        }
+      };
+
+      const renderHome = () => (
+        <div className="flex flex-col md:flex-row h-full items-center justify-center p-6 gap-12 bg-gray-100 min-h-screen">
+          <div className="flex flex-col items-center">
+            <h1 className="text-4xl md:text-6xl font-black text-gray-800 mb-2 tracking-tight">MATH<span className="text-red-500">QUEST</span></h1>
+            <p className="text-gray-500 font-bold mb-6 text-lg">Malaysia KSSR Edition</p>
+            
+            <div className="bg-white p-6 rounded-3xl shadow-xl border-4 border-gray-200">
+              <AvatarVisual equippedData={equipped} />
+            </div>
+            
+            <div className="flex items-center gap-4 mt-6 bg-white px-6 py-3 rounded-full shadow border-2 border-gray-200">
+              <Star className="text-yellow-400 fill-current w-8 h-8" />
+              <span className="text-2xl font-black text-gray-800">{score} Points</span>
+            </div>
+            
+            <button 
+              onClick={() => setScreen('wardrobe')}
+              className="mt-4 flex items-center gap-2 bg-gray-800 text-white px-6 py-3 rounded-full font-bold hover:bg-gray-700 transition"
+            >
+              <Shirt size={20} /> My Wardrobe
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-4 w-full max-w-sm">
+            <h2 className="text-2xl font-bold text-gray-700 text-center mb-2">Select Your Grade</h2>
+            {[3, 4, 5, 6].map(std => (
+              <button
+                key={std}
+                onClick={() => startGame(std)}
+                className="group relative w-full flex items-center justify-between p-5 bg-white border-4 border-red-500 rounded-2xl shadow-[0_8px_0_0_#b91c1c] hover:translate-y-[4px] hover:shadow-[0_4px_0_0_#b91c1c] transition-all active:translate-y-[8px] active:shadow-none"
+              >
+                <span className="text-2xl font-black text-gray-800 group-hover:text-red-600 transition">Standard {std}</span>
+                <Play className="text-red-500 w-8 h-8 group-hover:scale-110 transition" fill="currentColor" />
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+
+      const renderGame = () => {
+        if (!currentQuestion) return null;
+
+        return (
+          <div className="flex flex-col h-full min-h-screen bg-gray-100 p-4 md:p-8 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8 bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-200">
+              <button onClick={() => setScreen('home')} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition">
+                <Home size={28} />
+              </button>
+              
+              <div className="flex flex-col items-center flex-1 mx-4">
+                 <div className="flex items-center gap-2 mb-1">
+                   <Star className="text-yellow-400 fill-current w-6 h-6" />
+                   <span className="text-xl font-bold text-gray-800">{score}</span>
+                 </div>
+                 <div className="w-full max-w-xs bg-gray-200 h-3 rounded-full overflow-hidden relative">
+                    <div 
+                      className="bg-red-500 h-full transition-all duration-500"
+                      style={{ width: `${((5 - pointsToNextUnlock) / 5) * 100}%` }}
+                    />
+                 </div>
+                 <p className="text-xs text-gray-500 font-bold mt-1 text-center leading-tight">
+                   {pointsToNextUnlock} correct answers to<br/>unlock {getRarityForDifficulty(difficulty)} item!
+                 </p>
+              </div>
+
+              <button onClick={() => setScreen('wardrobe')} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-full transition">
+                <Shirt size={28} />
+              </button>
+            </div>
+
+            <div className="flex justify-between gap-2 mb-8 overflow-x-auto pb-2">
+              {['easiest', 'hard', 'very_hard', 'extreme'].map(diff => (
+                <button
+                  key={diff}
+                  onClick={() => { setDifficulty(diff); loadNewQuestion(selectedStd, diff); }}
+                  className={`flex-1 min-w-[80px] py-2 px-1 rounded-xl text-xs md:text-sm font-bold capitalize transition-all border-b-4 ${
+                    difficulty === diff 
+                      ? `${getDifficultyColor(diff)} text-white border-black/20 shadow-inner scale-95` 
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {diff.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border-4 border-gray-200 text-center relative flex-1 flex flex-col justify-center">
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-2 rounded-full font-bold text-sm tracking-widest shadow-md">
+                STD {selectedStd} • {difficulty.replace('_', ' ').toUpperCase()}
+              </div>
+              
+              <h2 className="text-3xl md:text-5xl font-black text-gray-800 leading-tight mb-8">
+                {currentQuestion.text}
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto">
+                {currentQuestion.options.map((opt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleAnswer(opt)}
+                    disabled={!!feedback}
+                    className="w-full py-4 px-6 text-xl md:text-2xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl border-4 border-transparent hover:border-gray-300 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+
+              {feedback && (
+                <div className={`absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-white/90 backdrop-blur-sm z-10 transition-opacity duration-200`}>
+                   {feedback.type === 'correct' ? (
+                     <CheckCircle className="w-32 h-32 text-green-500 mb-4 animate-bounce" />
+                   ) : (
+                     <XCircle className="w-32 h-32 text-red-500 mb-4" />
+                   )}
+                   <h3 className={`text-4xl font-black ${feedback.type === 'correct' ? 'text-green-600' : 'text-red-600'}`}>
+                     {feedback.msg}
+                   </h3>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      const renderWardrobe = () => {
+        const categories = [
+          { id: 'hats', icon: '🧢', label: 'Hats' },
+          { id: 'shirts', icon: '👕', label: 'Shirts' },
+          { id: 'pants', icon: '👖', label: 'Pants' },
+          { id: 'shoes', icon: '👟', label: 'Shoes' },
+        ];
+
+        return (
+          <div className="flex flex-col md:flex-row h-full min-h-screen bg-gray-100">
+            <div className="w-full md:w-1/3 bg-white p-6 shadow-xl z-10 flex flex-col items-center justify-center border-r-4 border-gray-200 relative">
+               <button onClick={() => setScreen('home')} className="absolute top-4 left-4 p-3 bg-gray-100 text-gray-600 hover:text-gray-900 rounded-full font-bold flex items-center gap-2 transition">
+                  <ChevronRight className="rotate-180" /> Back
+               </button>
+               <h2 className="text-3xl font-black text-gray-800 mb-8 mt-12">My Wardrobe</h2>
+               <div className="bg-gray-100 p-8 rounded-3xl border-4 border-gray-200">
+                 <AvatarVisual equippedData={equipped} />
+               </div>
+               <div className="mt-8 text-center">
+                 <div className="inline-flex items-center gap-2 bg-gray-800 text-white px-6 py-2 rounded-full text-lg font-bold">
+                   <Star className="text-yellow-400 fill-current w-5 h-5" /> {score} Points
+                 </div>
+               </div>
+            </div>
+
+            <div className="flex-1 flex flex-col p-6 h-full overflow-hidden">
+              <div className="flex gap-2 mb-6 bg-white p-2 rounded-2xl shadow-sm overflow-x-auto">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveTab(cat.id)}
+                    className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
+                      activeTab === cat.id ? 'bg-red-500 text-white shadow-inner' : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{cat.icon}</span> <span className="hidden sm:inline">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 pb-20">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {COSMETICS_DB[activeTab].map((item) => {
+                    const isUnlocked = inventory[activeTab].includes(item.id);
+                    const isEquipped = equipped[activeTab] === item.id;
+                    
+                    const rarityColors = {
+                      default: 'border-gray-200',
+                      common: 'border-green-300',
+                      rare: 'border-blue-300',
+                      epic: 'border-purple-400',
+                      legendary: 'border-yellow-400'
+                    };
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (isUnlocked) setEquipped({ ...equipped, [activeTab]: item.id });
+                        }}
+                        disabled={!isUnlocked}
+                        className={`relative p-4 rounded-2xl border-4 flex flex-col items-center justify-center text-center transition-all min-h-[140px]
+                          ${isEquipped ? 'bg-red-50 border-red-500 scale-105 shadow-lg' : 'bg-white hover:bg-gray-50'}
+                          ${!isUnlocked ? 'opacity-70 bg-gray-100 cursor-not-allowed border-gray-200' : rarityColors[item.rarity]}
+                        `}
+                      >
+                        {!isUnlocked && (
+                          <div className="absolute inset-0 bg-gray-200/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center z-10">
+                             <Lock className="w-8 h-8 text-gray-500" />
+                          </div>
+                        )}
+                        
+                        <div className="w-12 h-12 rounded-full mb-3 shadow-inner border-2 border-black/10 flex items-center justify-center" style={{ backgroundColor: item.color === 'transparent' ? '#f3f4f6' : item.color }}>
+                           {item.color === 'transparent' && <XCircle className="w-6 h-6 text-gray-300" />}
+                        </div>
+                        
+                        <span className="font-bold text-gray-700 text-sm">{item.name}</span>
+                        <span className="text-[10px] uppercase font-black tracking-wider text-gray-400 mt-1">{item.rarity}</span>
+                        
+                        {isEquipped && (
+                          <div className="absolute -top-3 -right-3 bg-red-500 text-white p-1 rounded-full shadow-md">
+                            <CheckCircle size={16} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="h-screen w-full font-sans bg-gray-100 overflow-hidden relative">
+          {screen === 'home' && renderHome()}
+          {screen === 'game' && renderGame()}
+          {screen === 'wardrobe' && renderWardrobe()}
+
+          {unlockModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-transform duration-300 border-8 border-yellow-400 relative overflow-hidden">
+                <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-100 rounded-full blur-2xl opacity-50"></div>
+                
+                <Award className="w-20 h-20 text-yellow-500 mx-auto mb-4" />
+                <h2 className="text-3xl font-black text-gray-800 mb-2">Item Unlocked!</h2>
+                <p className="text-gray-500 font-bold mb-6">You got a {unlockModal.rarity} item.</p>
+                
+                <div className="w-24 h-24 mx-auto rounded-full shadow-inner border-4 border-gray-100 mb-4 flex items-center justify-center" style={{ backgroundColor: unlockModal.color }}>
+                  <span className="text-4xl">✨</span>
+                </div>
+                
+                <h3 className="text-2xl font-black text-red-500 mb-6">{unlockModal.name}</h3>
+                
+                <button 
+                  onClick={() => setUnlockModal(null)}
+                  className="w-full bg-gray-800 text-white font-bold py-4 rounded-xl hover:bg-gray-700 transition active:scale-95"
+                >
+                  Awesome!
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Attach React component to the standard DOM
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
